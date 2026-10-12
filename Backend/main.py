@@ -1,6 +1,6 @@
 
 from fastapi import Depends, FastAPI
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db
@@ -13,7 +13,9 @@ from routers.analytics import router as analytics_router
 from routers.interviews import router as interviews_router
 
 
+# Create missing tables in the configured database.
 Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(
     title="Job Portal & Recruitment Management System",
@@ -23,6 +25,7 @@ app = FastAPI(
     ),
     version="1.0.0",
 )
+
 
 app.include_router(auth_router)
 app.include_router(jobs_router)
@@ -43,16 +46,15 @@ def home():
 @app.get("/health", tags=["General"])
 def health_check(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
-    return {"status": "healthy", "database": "connected"}
+    return {
+        "status": "healthy",
+        "database": "connected",
+    }
 
 
 @app.get("/database/tables", tags=["Database"])
-def list_tables(db: Session = Depends(get_db)):
-    result = db.execute(
-        text(
-            "SELECT name FROM sqlite_master "
-            "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' "
-            "ORDER BY name"
-        )
-    )
-    return {"tables": [row[0] for row in result]}
+def list_tables():
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+
+    return {"tables": sorted(tables)}
