@@ -4,15 +4,18 @@ import os
 import requests
 
 
-API_BASE_URL = os.getenv(
-    "API_BASE_URL",
-    "http://127.0.0.1:8000",
-)
+API_BASE_URL = os.getenv("API_BASE_URL", "").strip().rstrip("/")
 
 
 class APIClient:
     def __init__(self, token=None):
-        self.base_url = API_BASE_URL.rstrip("/")
+        if not API_BASE_URL:
+            raise RuntimeError(
+                "API_BASE_URL is not configured. Set it to your "
+                "FastAPI backend URL in Render or your local .env."
+            )
+
+        self.base_url = API_BASE_URL
         self.token = token
 
     def request(self, method, path, **kwargs):
@@ -31,8 +34,7 @@ class APIClient:
             )
         except requests.RequestException as exc:
             raise RuntimeError(
-                "Cannot connect to FastAPI. Make sure the backend "
-                "is running at " + self.base_url
+                "Cannot connect to FastAPI at " + self.base_url
             ) from exc
 
         if not response.ok:
@@ -94,17 +96,9 @@ class APIClient:
     # ---------------- JOBS ----------------
 
     def list_jobs(
-        self,
-        search="",
-        location="",
-        skills="",
-        skip=0,
-        limit=100,
+        self, search="", location="", skills="", skip=0, limit=100
     ):
-        params = {
-            "skip": skip,
-            "limit": limit,
-        }
+        params = {"skip": skip, "limit": limit}
 
         if search.strip():
             params["q"] = search.strip()
@@ -125,11 +119,7 @@ class APIClient:
         return self.request("GET", "/jobs/my")
 
     def update_job(self, job_id, job_data):
-        return self.request(
-            "PUT",
-            f"/jobs/{job_id}",
-            json=job_data,
-        )
+        return self.request("PUT", f"/jobs/{job_id}", json=job_data)
 
     def close_job(self, job_id):
         return self.request("PATCH", f"/jobs/{job_id}/close")
@@ -140,23 +130,14 @@ class APIClient:
         return self.request(
             "POST",
             f"/applications/jobs/{job_id}/apply",
-            files={
-                "resume": (
-                    filename,
-                    file_bytes,
-                    mime_type,
-                )
-            },
+            files={"resume": (filename, file_bytes, mime_type)},
         )
 
     def get_my_applications(self):
         return self.request("GET", "/applications/my")
 
     def get_applicants(self, job_id):
-        return self.request(
-            "GET",
-            f"/applications/jobs/{job_id}",
-        )
+        return self.request("GET", f"/applications/jobs/{job_id}")
 
     def update_application_status(self, application_id, new_status):
         return self.request(
